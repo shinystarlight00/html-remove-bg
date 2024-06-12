@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Background Removal with Fabric.js</title>
+    <script src="./fabric.js"></script>
+    <style>
+      body {
+        background-color: pink;
+      }
+    </style>
+  </head>
+  <body>
+    <input type="file" id="upload" accept="image/*" />
+    <canvas id="canvas"></canvas>
+    <script>
+      const canvasElement = document.getElementById("canvas");
+      const fabricCanvas = new fabric.Canvas(canvasElement);
+      const upload = document.getElementById("upload");
+
+      upload.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+          fabric.Image.fromURL(e.target.result, (img) => {
+            fabricCanvas.clear();
+            img.scaleToWidth(fabricCanvas.width);
+            img.scaleToHeight(fabricCanvas.height);
+            fabricCanvas.add(img);
+            removeBackground(img);
+          });
+        };
+
+        reader.readAsDataURL(file);
+      });
+
+      function removeBackground(img) {
+        img.cloneAsImage((clonedImg) => {
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const ctx = tempCanvas.getContext("2d");
+          ctx.drawImage(clonedImg.getElement(), 0, 0);
+
+          const imageData = ctx.getImageData(
+            0,
+            0,
+            tempCanvas.width,
+            tempCanvas.height
+          );
+
+          const data = imageData.data;
+
+          const backgroundColor = { r: data[0], g: data[1], b: data[2] };
+
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            if (isSameColor(r, g, b, backgroundColor)) {
+              data[i + 3] = 0; // Set alpha to 0 (transparent)
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          fabric.Image.fromURL(
+            tempCanvas.toDataURL(),
+            (imgWithTransparentBg) => {
+              imgWithTransparentBg.scaleToWidth(fabricCanvas.width);
+              imgWithTransparentBg.scaleToHeight(fabricCanvas.height);
+              fabricCanvas.clear();
+              fabricCanvas.add(imgWithTransparentBg);
+            }
+          );
+        });
+      }
+
+      function isSameColor(r, g, b, bgColor, tolerance = 30) {
+        return (
+          Math.abs(r - bgColor.r) < tolerance &&
+          Math.abs(g - bgColor.g) < tolerance &&
+          Math.abs(b - bgColor.b) < tolerance
+        );
+      }
+    </script>
+  </body>
+</html>
